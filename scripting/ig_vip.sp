@@ -27,12 +27,35 @@ bool g_bUpdatingColours[MAXPLAYERS + 1];
 
 bool g_bLoaded[MAXPLAYERS + 1];
 
-void VIP_OnPluginStart() {
+public Plugin myinfo =
+{
+		author = "Imperfect Gamers",
+		url = "imperfectgamers.org",
+		name = "Imperfect Gamers VIP",
+		description = "VIP commands and titles, reports",
+		version = "1.0"
+};
+
+ConVar g_hChatPrefix = null;
+char g_szChatPrefix[256];
+
+char g_sServerName[256];
+ConVar g_hHostName = null;
+
+
+public OnPluginStart() {
 	
 	PrintToServer("LOADING IG VIP");
 	/* for (int i = 0; i < 10; i++) {
 		PrintToServer("ig_vip----");
 	} */
+	
+	g_hHostName = FindConVar("hostname");
+	HookConVarChange(g_hHostName, OnSettingChanged);
+	GetConVarString(g_hHostName, g_sServerName, sizeof(g_sServerName));
+	
+	g_hChatPrefix = CreateConVar("ig_chat_prefix", "{lime}IG {default}|", "Determines the prefix used for chat messages", FCVAR_NOTIFY);
+	HookConVarChange(g_hChatPrefix, OnSettingChanged);
 	
 	RegConsoleCmd("sm_vip", Command_Vip, "[ImperfectGamers] [vip] Displays the VIP menu to client");
 	RegConsoleCmd("sm_vmute", Command_Vmute, "[ImperfectGamers] [vip] Toggle vmute on a player");
@@ -59,7 +82,7 @@ void VIP_OnPluginStart() {
 	SQL_SetCharset(g_hDb, "utf8mb4");
 }
 
-void VIP_OnClientPutInServer(int client) {
+public OnClientPutInServer(client) {
 	g_bLoaded[client] = false;
 	g_szTitle[client] = "LOADING";
 	g_szTitlePlain[client] = "LOADING";
@@ -87,6 +110,39 @@ void db_refreshCustomTitles(int client) {
 	
 	SQL_TQuery(g_hDb, db_refreshCustomTitlesCb, szQuery, client);
 }
+
+public void RemoveColorsFromString(char[] ParseString, int size)
+{
+	ReplaceString(ParseString, size, "{default}", "", false);
+	ReplaceString(ParseString, size, "{white}", "", false);
+	ReplaceString(ParseString, size, "{darkred}", "", false);
+	ReplaceString(ParseString, size, "{green}", "", false);
+	ReplaceString(ParseString, size, "{lime}", "", false);
+	ReplaceString(ParseString, size, "{blue}", "", false);
+	ReplaceString(ParseString, size, "{lightgreen}", "", false);
+	ReplaceString(ParseString, size, "{red}", "", false);
+	ReplaceString(ParseString, size, "{grey}", "", false);
+	ReplaceString(ParseString, size, "{gray}", "", false);
+	ReplaceString(ParseString, size, "{yellow}", "", false);
+	ReplaceString(ParseString, size, "{lightblue}", "", false);
+	ReplaceString(ParseString, size, "{darkblue}", "", false);
+	ReplaceString(ParseString, size, "{pink}", "", false);
+	ReplaceString(ParseString, size, "{lightred}", "", false);
+	ReplaceString(ParseString, size, "{purple}", "", false);
+	ReplaceString(ParseString, size, "{darkgrey}", "", false);
+	ReplaceString(ParseString, size, "{darkgray}", "", false);
+	ReplaceString(ParseString, size, "{limegreen}", "", false);
+	ReplaceString(ParseString, size, "{orange}", "", false);
+	ReplaceString(ParseString, size, "{olive}", "", false);
+}
+
+bool IsValidClient(int client)
+{
+	if (client >= 1 && client <= MaxClients && IsValidEntity(client) && IsClientConnected(client) && IsClientInGame(client))
+		return true;
+	return false;
+}
+
 
 void db_refreshCustomTitlesCb(Handle hDriver, Handle hResult, const char[] error, any client) {
 	if (hResult == null) {
@@ -373,6 +429,19 @@ public void NextTitle(int client, int target) {
 						}
 				}
 		}
+}
+
+
+public void OnSettingChanged(Handle convar, const char[] oldValue, const char[] newValue)
+{
+	if (convar == g_hHostName)
+	{
+		GetConVarString(g_hHostName, g_sServerName, sizeof(g_sServerName));
+	}
+	else if (convar == g_hChatPrefix)
+	{
+		GetConVarString(g_hChatPrefix, g_szChatPrefix, sizeof(g_szChatPrefix));
+	}
 }
 
 public void SaveRawTitle(int client, char[] raw) {
