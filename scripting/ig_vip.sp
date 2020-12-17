@@ -12,8 +12,6 @@ Handle g_hDb = null;
 #define MAX_TITLES 32
 #define MAX_RAWTITLE_LENGTH 1024
 
-#define VOTE_NO "###no###"
-#define VOTE_YES "###yes###"
 
 char g_szTitle[MAXPLAYERS + 1][MAX_TITLE_LENGTH];
 char g_szTitlePlain[MAXPLAYERS + 1][MAX_TITLE_LENGTH];
@@ -67,7 +65,6 @@ public OnPluginStart() {
 	RegConsoleCmd("sm_title", Command_PlayerTitle, "[ImperfectGamers] [vip] Displays a menu to the player showing their custom title and allowing them to change their colours");
 	RegConsoleCmd("sm_namecolour", Command_SetDbNameColour, "[ImperfectGamers] [vip] VIPs can set their own custom name colour into the db");
 	RegConsoleCmd("sm_textcolour", Command_SetDbTextColour, "[ImperfectGamers] [vip] VIPs can set their own custom text colour into the db");
-	RegConsoleCmd("sm_ve", Command_VoteExtend, "[ImperfectGamers] [vip] Vote to extend the map");
 	RegConsoleCmd("sm_colours", Command_ListColours, "[ImperfectGamers] Lists available colours for sm_mytitle and sm_namecolour");
 	
 	char szError[255];
@@ -111,6 +108,42 @@ void db_refreshCustomTitles(int client) {
 	SQL_TQuery(g_hDb, db_refreshCustomTitlesCb, szQuery, client);
 }
 
+
+
+public Action OnClientSayCommand( int client, const char[] szCommand, const char[] szMsg )
+{
+	if (!IsValidClient(client))
+	{
+		return Plugin_Continue;
+	}
+
+	char sText[1024];
+	strcopy(sText, sizeof(sText), szMsg);
+
+	StripQuotes(sText);
+	TrimString(sText);
+
+
+	char szName[64];
+	GetClientName(client, szName, 64);
+	CRemoveColors(szName, 64);
+	
+	if (IsPlayerVip(client, true, false)) {
+		SetTextColor(szName, g_iCustomColours[client][0], sizeof(szName));
+		SetTextColor(sText, g_iCustomColours[client][1], sizeof(sText));
+	}
+
+	if (g_bDbCustomTitleInUse[client])
+		CPrintToChatAll("{default}%s {gray}| {default}%s{gray}: {default}%s", g_szTitle[client], szName, sText);
+	else
+		CPrintToChatAll("{default}%s{gray}: {default}%s", szName, sText);
+		
+	return Plugin_Handled;
+}
+
+
+
+
 public void RemoveColorsFromString(char[] ParseString, int size)
 {
 	ReplaceString(ParseString, size, "{default}", "", false);
@@ -135,6 +168,62 @@ public void RemoveColorsFromString(char[] ParseString, int size)
 	ReplaceString(ParseString, size, "{orange}", "", false);
 	ReplaceString(ParseString, size, "{olive}", "", false);
 }
+
+#define WHITE 0x01
+#define DARKRED 0x02
+#define PURPLE 0x03
+#define GREEN 0x04
+#define LIGHTGREEN 0x05 
+#define LIMEGREEN 0x06
+#define RED 0x07
+#define GRAY 0x08
+#define YELLOW 0x09
+#define ORANGE 0x10
+#define DARKGREY 0x0A
+#define BLUE 0x0B
+#define DARKBLUE 0x0C
+#define LIGHTBLUE 0x0D
+#define PINK 0x0E
+#define LIGHTRED 0x0F
+public void SetTextColor(char[] sText, int index, int size)
+{
+	switch (index)
+	{
+		case 0: // 1st Rank
+			Format(sText, size, "%c%s", WHITE, sText);
+		case 1:
+			Format(sText, size, "%c%s", DARKRED, sText);
+		case 2:
+			Format(sText, size, "%c%s", GREEN, sText);
+		case 3:
+			Format(sText, size, "%c%s", LIMEGREEN, sText);
+		case 4:
+			Format(sText, size, "%c%s", BLUE, sText);
+		case 5:
+			Format(sText, size, "%c%s", LIGHTGREEN, sText);
+		case 6:
+			Format(sText, size, "%c%s", RED, sText);
+		case 7:
+			Format(sText, size, "%c%s", GRAY, sText);
+		case 8:
+			Format(sText, size, "%c%s", YELLOW, sText);
+		case 9:
+			Format(sText, size, "%c%s", LIGHTBLUE, sText);
+		case 10:
+			Format(sText, size, "%c%s", DARKBLUE, sText);
+		case 11:
+			Format(sText, size, "%c%s", PINK, sText);
+		case 12:
+			Format(sText, size, "%c%s", LIGHTRED, sText);
+		case 13:
+			Format(sText, size, "%c%s", PURPLE, sText);
+		case 14:
+			Format(sText, size, "%c%s", DARKGREY, sText);
+		case 15:
+			Format(sText, size, "%c%s", ORANGE, sText);
+	}
+}
+
 
 bool IsValidClient(int client)
 {
@@ -707,74 +796,7 @@ public Action Command_PlayerTitle(int client, int args)
 	return Plugin_Handled;
 }
 
-public Action Command_VoteExtend(int client, int args)
-{
-	if (!IsValidClient(client) || !IsPlayerVip(client))
-		return Plugin_Handled;
 
-	VoteExtend(client);
-	return Plugin_Handled;
-}
-
-public void VoteExtend(int client)
-{
-	int timeleft;
-	GetMapTimeLeft(timeleft);
-
-	if (timeleft > 300)
-	{
-		CPrintToChat(client, "%t", "ig_vip_extend_early", g_szChatPrefix);
-		return;
-	}
-
-	if (IsVoteInProgress())
-	{
-		CPrintToChat(client, "%t", "ig_vip_extend_in_vote", g_szChatPrefix);
-		return;
-	}
-
-	char szPlayerName[MAX_NAME_LENGTH];
-	GetClientName(client, szPlayerName, MAX_NAME_LENGTH);
-
-	Menu hMenu = CreateMenu(Handle_VoteMenuExtend);
-	SetMenuTitle(hMenu, "Extend the map by 10 minutes?");
-	AddMenuItem(hMenu, "###yes###", "Yes");
-	AddMenuItem(hMenu, "###no###", "No");
-	SetMenuExitButton(hMenu, false);
-	VoteMenuToAll(hMenu, 20);
-	CPrintToChatAll("%t", "ig_vip_extend_vote_initiated", g_szChatPrefix, szPlayerName);
-
-	return;
-}
-
-public int Handle_VoteMenuExtend(Menu hMenu, MenuAction action, int param1, int param2)
-{
-	if (action == MenuAction_End) {
-		/* This is called after VoteEnd */
-		CloseHandle(hMenu);
-	} else if (action == MenuAction_VoteEnd) {
-		char item[64], display[64];
-		float percent, limit;
-		int votes, totalVotes;
-
-		hMenu.GetItem(param1, item, sizeof(item), _, display, sizeof(display));
-		GetMenuVoteInfo(param2, votes, totalVotes);
-
-		if (strcmp(item, VOTE_NO) == 0 && param1 == 1)
-		votes = totalVotes - votes;
-
-		percent = float(votes) / float(totalVotes);
-
-		/* 0=yes, 1=no */
-		if ((strcmp(item, VOTE_YES) == 0 && FloatCompare(percent,limit) < 0 && param1 == 0) || (strcmp(item, VOTE_NO) == 0 && param1 == 1)) {
-			CPrintToChatAll("%t", "ig_vote_failed", g_szChatPrefix, RoundToNearest(100.0*limit), RoundToNearest(100.0*percent), totalVotes);
-		} else {
-			CPrintToChatAll("%t", "ig_vote_successful", g_szChatPrefix, RoundToNearest(100.0*percent), totalVotes);
-			CPrintToChatAll("%t", "ig_vip_extend_result", g_szChatPrefix);
-			ExtendMapTimeLimit(600);
-		}
-	}
-}
 
 public void CustomTitleMenu(int client)
 {
